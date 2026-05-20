@@ -99,7 +99,7 @@
       };
 
       packages.${system} = {
-        argentum-plymouth = pkgs.callPackage ./themes/argentum-plymouth { };
+        argentum-plymouth = pkgs.callPackage ./modules/boot/argentum-plymouth { };
         installer = pkgs.callPackage ./installer { };
         iso = self.nixosConfigurations.argentumISO.config.system.build.isoImage;
         toplevel = self.nixosConfigurations.argentumOS.config.system.build.toplevel;

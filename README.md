@@ -1,137 +1,83 @@
 # argentumOS
 
-A NixOS-based consumer Linux distribution focused on a polished, silent boot
-experience and a heavily customized Cinnamon desktop. Apps are delivered via
-Flatpak; first-class Wine integration is planned.
+A consumer-grade Linux desktop built around a polished, silent boot and a
+familiar Cinnamon environment. You install it, you sign in, and your computer
+just works — no dotfiles, no terminal, no weekend lost to configuration.
 
-This repository is a **scaffold** — many subsystems (theme assets, app store
-UI, Wine integration) are intentionally stubbed and will be filled in by later
-work.
+> **Our philosophy:** if you need to open `nano` and the terminal to fix
+> something mundane, *we failed.*
+>
+> Everything an average person should be able to do on their own computer —
+> installing an app, changing the wallpaper, connecting to Wi-Fi, fixing a
+> broken setting — should be a click, not a command.
 
-## Layout
+## Get argentumOS
 
-```
-argentumOS/
-├── flake.nix                          # flake entry point + nixosConfigurations
-├── Dockerfile                         # build image for non-NixOS hosts
-├── docker-compose.yml                 # builder / iso / vm services
-├── scripts/
-│   ├── build.sh                       # nix build wrapper
-│   ├── test-vm.sh                     # QEMU smoke-test runner
-│   └── test-installer.sh              # boot ISO with blank disk for installer
-├── modules/
-│   ├── boot/default.nix               # silent GRUB + Plymouth + kernel quieting
-│   ├── desktop/default.nix            # Cinnamon DE
-│   ├── desktop/theme/default.nix      # GTK / icon / panel theme stubs
-│   ├── apps/flatpak.nix               # Flatpak + Flathub
-│   ├── wine/default.nix               # Wine module (disabled stub)
-│   └── installer.nix                  # Calamares + autostart (live-ISO only)
-├── installer/                         # Calamares installer (live ISO only)
-│   ├── default.nix                    # installer Nix derivation
-│   ├── calamares/                     # settings.conf + branding + nixos-install module
-│   └── qml/                           # custom QML pages + components
-└── themes/
-    └── argentum-plymouth/             # Plymouth boot splash derivation
-        ├── default.nix
-        └── assets/
-            ├── argentum.plymouth
-            ├── argentum.script
-            └── splash.png             # placeholder 1×1 PNG
-```
+1. **Download** the latest `argentumOS.iso` from the
+   [Releases page](https://github.com/) *(link will go live with the first
+   release)*.
+2. **Write it to a USB stick** (8 GB or larger) using whichever tool you
+   already trust:
+   - **On Windows:** [Rufus](https://rufus.ie) — pick the ISO, pick your USB,
+     click *Start*.
+   - **On macOS:** [balenaEtcher](https://etcher.balena.io) — *Flash from
+     file*, choose your USB, *Flash*.
+   - **On another Linux:** open *Disks* (or *GNOME Disks*), select your USB,
+     and use *Restore Disk Image…* to point at the ISO.
 
-## Building
+No `dd`, no checksums to copy-paste — pick a tool, click the buttons, eject.
 
-### On a NixOS host
+## Install it
 
-```bash
-nix flake check
-nixos-rebuild build --flake .#argentumOS
-nix build .#argentum-plymouth
-```
+1. Plug the USB stick into the computer you want argentumOS on, and turn it on
+   while holding the boot-menu key (usually **F12**, **F10**, **Esc**, or
+   **F2** — your laptop manufacturer tells you which).
+2. Pick your USB stick from the boot menu. argentumOS boots straight to the
+   desktop — no menu, no prompts.
+3. The **Install argentumOS** window opens automatically a moment after the
+   desktop appears. (If it doesn't, double-click the *Install argentumOS*
+   icon.)
+4. Click through:
+   - **Language** — pick yours.
+   - **Keyboard** — pick yours.
+   - **Disk** — pick the disk you want to install on. *This erases the disk
+     you select.* Pick carefully.
+   - **You** — type a name and a password.
+   - **Install** — go grab a coffee. When it finishes, *Restart*.
+5. Pull the USB stick out when the screen goes dark. The computer reboots
+   into argentumOS.
 
-To build a bootable ISO, add an installer config (see
-`<nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix>`) to the
-flake and target `config.system.build.isoImage`.
+That's the whole installer. There is no terminal step. There is no
+configuration file to edit. If any of the screens above ever asked you to
+type a command, that is a bug — please open an issue.
 
-### On a non-NixOS host (Docker)
+## After install
 
-```bash
-docker compose build
-docker compose run --rm builder           # full system closure
-docker compose run --rm iso               # bootable ISO → ./build-output/argentumOS.iso
-docker compose run --rm plymouth          # theme derivation only
-docker compose --profile test up vm       # QEMU boot (needs /dev/kvm)
-```
+- The first boot is silent — no scrolling text, no bootloader menu. You see a
+  splash and then the login screen.
+- Sign in with the name and password you just chose.
+- Apps live in **Software**. Search, click *Install*, done. The catalog comes
+  from [Flathub](https://flathub.org), so the apps you'd expect — Firefox,
+  Spotify, Discord, OBS, LibreOffice, Steam — are all there.
+- Everything else is in **System Settings** (Wi-Fi, display, sound, users,
+  appearance). It opens from the start menu like on any other desktop.
 
-The `nix-store` named volume keeps the Nix store warm across runs, so only the
-first build pays for nixpkgs evaluation. The ISO derivation lives in that
-volume; `scripts/build.sh iso` copies the final `.iso` out into
-`./build-output/` so it is reachable from the host.
+## Something's wrong
 
-## QEMU Testing
+Open an issue on [GitHub](https://github.com/). Please describe what you
+expected to be possible without the terminal — if the answer was "use the
+terminal," we want to know about it.
 
-Uses the host's QEMU (no Nix required on host) to boot the built ISO.
-Default: UEFI boot via OVMF, KVM accelerated, GTK window.
+## Coming soon
 
-```bash
-./scripts/test-vm.sh                      # UEFI + KVM + GTK
-HEADLESS=1 ./scripts/test-vm.sh           # VNC at localhost:5900
-BIOS=1 ./scripts/test-vm.sh               # legacy BIOS boot (no OVMF needed)
-CLEAN=1 ./scripts/test-vm.sh              # drop persistent qcow2 disk first
-MEMORY=8G SMP=8 ./scripts/test-vm.sh      # custom RAM / vCPU
-ISO=/path/to/other.iso ./scripts/test-vm.sh
-OVMF=/usr/share/OVMF/OVMF_CODE.fd ./scripts/test-vm.sh
-```
+- A native **argentumOS App Store** — a curated, friendlier face for Flathub
+  with featured picks and one-click app collections.
+- **First-class Wine integration** — install a Windows program by
+  double-clicking the `.exe`, with sensible defaults handled for you.
+- **Custom argentum themes** — proper `argentum-gtk` and `argentum-icons`
+  packages, replacing the placeholder look you see today.
 
-Requires `qemu-system-x86_64` and (for UEFI) an `ovmf` package installed on the
-host. Add yourself to the `kvm` group to avoid sudo (`sudo usermod -aG kvm
-$USER` then re-login). Running under `sudo` will break GTK's X11 auth — use
-`HEADLESS=1` if you must run as root.
+---
 
-## Replacing Placeholder Assets
-
-- **Plymouth splash**: drop a real `splash.png` (and optional `frame-NNN.png`
-  animation frames) into `themes/argentum-plymouth/assets/` and update
-  `argentum.script` to cycle them.
-- **GTK / icon themes**: replace `adw-gtk3` / `papirus-icon-theme` references
-  in `modules/desktop/theme/default.nix` with derivations for the future
-  `argentum-gtk` and `argentum-icons` packages.
-
-## Installer
-
-The live ISO autostarts a Calamares-based installer themed for argentumOS.
-
-| Step          | Implementation                                    |
-| ------------- | ------------------------------------------------- |
-| Welcome       | Custom QML (`installer/qml/pages/Welcome.qml`)    |
-| Locale        | Upstream widget, themed via `stylesheet.qss`      |
-| Keyboard      | Upstream widget, themed via `stylesheet.qss`      |
-| Partition     | Upstream widget, themed via `stylesheet.qss`      |
-| Users         | Upstream widget, themed via `stylesheet.qss`      |
-| Summary       | Custom QML (`installer/qml/pages/Summary.qml`)    |
-| Install       | `installer/calamares/modules/nixos-install/main.py` runs `nixos-install` |
-| Finish        | Custom QML (`installer/qml/pages/Finish.qml`)     |
-
-The install step writes a small `configuration.nix` to the target that
-imports the same `modules/` tree the live ISO ships, so the installed system
-inherits every argentumOS module (boot, desktop, branding, etc.) automatically.
-
-End-to-end test (UEFI VM, fresh 32 GB disk):
-
-```bash
-./scripts/build.sh iso
-./scripts/test-installer.sh
-```
-
-See `installer/README.md` for architecture details, QML iteration without
-booting a VM (`qmlscene installer/qml/main.qml`), and how to add a new
-Calamares module.
-
-## Roadmap
-
-- **Native app store frontend** — Flatpak is the backend today; a dedicated
-  GUI (with curated catalog, Wine wrappers, etc.) is a separate workstream.
-- **First-class Wine integration** — DXVK/VKD3D presets, prefix management,
-  Bottles-style UI, `.exe` file association handling.
-- **Custom theme packages** — proper `argentum-gtk` and `argentum-icons`
-  derivations replacing the current stand-ins.
+*Contributing? See `flake.nix` and `scripts/build.sh` for the build entry
+points, and `installer/README.md` for the installer architecture.*

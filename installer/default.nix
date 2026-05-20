@@ -4,7 +4,7 @@
   # Branding asset source-of-truth: same directory consumed by the Plymouth
   # theme derivation. Both derivations independently produce store paths
   # containing splash.png; the working-tree source is single.
-, plymouthAssets ? ../themes/argentum-plymouth/assets
+, plymouthAssets ? ../modules/boot/argentum-plymouth/assets
 }:
 
 let

@@ -15,7 +15,7 @@ installer/
 │   │   ├── branding.desc                # frameless fullscreen, dark palette, slideshow
 │   │   ├── stylesheet.qss               # QSS for upstream widget pages
 │   │   ├── show.qml                     # sidebar slideshow (branding API 2)
-│   │   └── splash.png                   # symlinked-by-source from themes/argentum-plymouth/assets
+│   │   └── splash.png                   # symlinked-by-source from modules/boot/argentum-plymouth/assets
 │   └── modules/nixos-install/
 │       ├── module.desc
 │       └── main.py                      # writes configuration.nix + runs nixos-install(8)
@@ -73,7 +73,7 @@ Calamares logs on the live ISO live at `~/.cache/Calamares/session.log` and
 ## Asset sharing with the Plymouth theme
 
 `installer/default.nix` reads `splash.png` from
-`themes/argentum-plymouth/assets/` at evaluation time. Both the Plymouth
+`modules/boot/argentum-plymouth/assets/` at evaluation time. Both the Plymouth
 derivation and the installer derivation consume the same source directory —
 working-tree source-of-truth stays single. At runtime each derivation owns a
 store path containing its own copy of `splash.png`; pure Nix cannot symlink

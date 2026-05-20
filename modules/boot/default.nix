@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  argentumPlymouth = pkgs.callPackage ../../themes/argentum-plymouth { };
+  argentumPlymouth = pkgs.callPackage ./argentum-plymouth { };
 in {
   boot.loader.systemd-boot.enable = lib.mkDefault false;
 

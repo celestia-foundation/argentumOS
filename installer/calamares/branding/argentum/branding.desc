@@ -21,7 +21,7 @@ strings:
   supportUrl:          "https://github.com/"
   releaseNotesUrl:     "https://github.com/"
 
-# splash.png comes from themes/argentum-plymouth/assets/ — single source of
+# splash.png comes from modules/boot/argentum-plymouth/assets/ — single source of
 # truth in the working tree, materialised here by installer/default.nix.
 images:
   productLogo:    "splash.png"
