@@ -1,0 +1,19 @@
+[package]
+name = "argentum-settings-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Backend logic (D-Bus, subprocess wrappers) for argentum-settings. No UI framework dependencies."
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+serde.workspace = true
+zbus.workspace = true
+thiserror = "1"
+rustix = { version = "0.38", features = ["process"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }

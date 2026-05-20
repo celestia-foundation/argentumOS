@@ -59,8 +59,9 @@ type a command, that is a bug — please open an issue.
 - Apps live in **Software**. Search, click *Install*, done. The catalog comes
   from [Flathub](https://flathub.org), so the apps you'd expect — Firefox,
   Spotify, Discord, OBS, LibreOffice, Steam — are all there.
-- Everything else is in **System Settings** (Wi-Fi, display, sound, users,
-  appearance). It opens from the start menu like on any other desktop.
+- Everything else is in **System Settings** — the native argentumOS panel
+  (Wi-Fi, display, users, appearance, software, system). It opens from the
+  start menu like on any other desktop.
 
 ## Something's wrong
 
@@ -76,6 +77,12 @@ terminal," we want to know about it.
   double-clicking the `.exe`, with sensible defaults handled for you.
 - **Custom argentum themes** — proper `argentum-gtk` and `argentum-icons`
   packages, replacing the placeholder look you see today.
+
+## Done recently
+
+- **Native System Settings panel** — argentumOS now ships its own
+  Rust/GPUI settings app instead of the default Cinnamon panel. Source
+  lives in `settings-panel/`; see `settings-panel/README.md`.
 
 ---
 

@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "argentum-settings",
+    "argentum-settings-core",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["argentumOS contributors"]
+
+[workspace.dependencies]
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "sync", "time", "io-util"] }
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+zbus = { version = "4", default-features = false, features = ["tokio"] }
+clap = { version = "4", features = ["derive"] }
+
+# GPUI: pinned to Zed v1.2.7 (released 2026-05-19) — most recent stable, non-pre
+# tagged release at scaffold time. See settings-panel/README.md § "Bumping the
+# GPUI pin" for how to update.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "deb48ceb47125223df73902d1c3b72f2f442222b" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "deb48ceb47125223df73902d1c3b72f2f442222b", features = ["font-kit", "wayland", "x11"] }
+
+argentum-settings-core = { path = "argentum-settings-core" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0

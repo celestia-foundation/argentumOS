@@ -1,0 +1,21 @@
+[package]
+name = "argentum-settings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Native argentumOS system settings panel."
+
+[[bin]]
+name = "argentum-settings"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+clap.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+argentum-settings-core.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

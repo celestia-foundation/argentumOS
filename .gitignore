@@ -4,3 +4,4 @@
 *.fd
 result/
 flake.lock
+settings-panel/target/

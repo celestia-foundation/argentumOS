@@ -21,6 +21,7 @@
         ./modules/apps/flatpak.nix
         ./modules/wine
         ./modules/branding
+        ./modules/settings.nix
         ./modules/installer.nix
 
         ({ lib, ... }: {
@@ -100,6 +101,7 @@
 
       packages.${system} = {
         argentum-plymouth = pkgs.callPackage ./modules/boot/argentum-plymouth { };
+        argentum-settings = pkgs.callPackage ./settings-panel { };
         installer = pkgs.callPackage ./installer { };
         iso = self.nixosConfigurations.argentumISO.config.system.build.isoImage;
         toplevel = self.nixosConfigurations.argentumOS.config.system.build.toplevel;
