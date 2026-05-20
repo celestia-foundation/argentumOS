@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "argentum-app-store",
+    "argentum-app-store-core",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["argentumOS contributors"]
+
+[workspace.dependencies]
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "sync", "time", "io-util"] }
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+flate2 = "1"
+quick-xml = "0.36"
+thiserror = "1"
+
+# GPUI: pinned to the same Zed commit as settings-panel/Cargo.toml so both apps
+# share a single resolved revision. See app-store/README.md § "Bumping the
+# GPUI pin" for the bump workflow.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "deb48ceb47125223df73902d1c3b72f2f442222b" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "deb48ceb47125223df73902d1c3b72f2f442222b", features = ["font-kit", "wayland", "x11"] }
+
+argentum-app-store-core = { path = "argentum-app-store-core" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
