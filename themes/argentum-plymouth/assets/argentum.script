@@ -1,0 +1,26 @@
+// argentumOS Plymouth boot splash script.
+//
+// Renders a centered splash image on a dark background. Designed as a stub
+// for a fuller animation; to extend, drop frame-NNN.png files into the
+// theme assets directory and step through them via the refresh callback.
+
+Window.SetBackgroundTopColor(0.07, 0.08, 0.10);
+Window.SetBackgroundBottomColor(0.02, 0.02, 0.04);
+
+splash.image = Image("splash.png");
+splash.sprite = Sprite(splash.image);
+splash.sprite.SetX(Window.GetWidth()  / 2 - splash.image.GetWidth()  / 2);
+splash.sprite.SetY(Window.GetHeight() / 2 - splash.image.GetHeight() / 2);
+
+progress = 0.0;
+
+fun refresh_callback()
+{
+    progress = progress + 0.01;
+    if (progress > 1.0) progress = 0.0;
+    splash.sprite.SetOpacity(0.5 + Math.Cos(progress * 6.2831) * 0.25 + 0.25);
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+fun message_callback(text) { }
+Plymouth.SetMessageFunction(message_callback);

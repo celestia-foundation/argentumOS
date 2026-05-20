@@ -1,0 +1,51 @@
+services:
+  builder:
+    build: .
+    image: argentumos-builder:latest
+    container_name: argentumos-builder
+    volumes:
+      - .:/workspace
+      - ./build-output:/workspace/result
+      - nix-store:/nix
+    command: ["toplevel"]
+
+  iso:
+    image: argentumos-builder:latest
+    build: .
+    container_name: argentumos-iso
+    volumes:
+      - .:/workspace
+      - ./build-output:/workspace/result
+      - nix-store:/nix
+    command: ["iso"]
+
+  plymouth:
+    image: argentumos-builder:latest
+    build: .
+    container_name: argentumos-plymouth
+    volumes:
+      - .:/workspace
+      - ./build-output:/workspace/result
+      - nix-store:/nix
+    command: ["plymouth"]
+
+  vm:
+    image: argentumos-builder:latest
+    build: .
+    container_name: argentumos-vm
+    profiles: ["test"]
+    privileged: true
+    devices:
+      - "/dev/kvm:/dev/kvm"
+    ports:
+      - "5900:5900"
+    environment:
+      HEADLESS: "1"
+    volumes:
+      - .:/workspace
+      - ./build-output:/workspace/result
+      - nix-store:/nix
+    entrypoint: ["/workspace/scripts/test-vm.sh"]
+
+volumes:
+  nix-store:

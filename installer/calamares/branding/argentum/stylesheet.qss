@@ -1,0 +1,87 @@
+/* Argentum QSS — themes the upstream C++/widget pages
+   (locale, keyboard, partition, users) to match the dark palette used by
+   the QML view-steps and the rest of argentumOS. */
+
+QWidget {
+    background-color: #0f1218;
+    color: #e6e8ee;
+    font-size: 13px;
+}
+
+QPushButton {
+    background: #7aa2f7;
+    color: #0f1218;
+    border: 0;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-weight: 600;
+}
+QPushButton:hover    { background: #8ab4ff; }
+QPushButton:pressed  { background: #5e7cc4; }
+QPushButton:disabled { background: #2a2f3a; color: #6c7280; }
+
+QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit {
+    background: #1a1f2b;
+    color: #e6e8ee;
+    border: 1px solid #7aa2f7;
+    border-radius: 4px;
+    padding: 4px 6px;
+    selection-background-color: #7aa2f7;
+    selection-color: #0f1218;
+}
+
+QTreeView, QListView, QTableView {
+    background: #0f1218;
+    alternate-background-color: #131722;
+    color: #e6e8ee;
+    border: 1px solid #2a2f3a;
+}
+QHeaderView::section {
+    background: #1a1f2b;
+    color: #e6e8ee;
+    border: 0;
+    padding: 4px;
+}
+
+QGroupBox {
+    border: 1px solid #2a2f3a;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+QGroupBox::title {
+    color: #9aa0ad;
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+}
+
+/* Calamares-specific named widgets. */
+#sidebarApp {
+    background: #0f1218;
+}
+#mainApp QProgressBar {
+    border: 0;
+    background: #1a1f2b;
+    border-radius: 3px;
+    height: 6px;
+}
+#mainApp QProgressBar::chunk {
+    background: #7aa2f7;
+    border-radius: 3px;
+}
+
+QScrollBar:vertical {
+    background: #0f1218;
+    width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #2a2f3a;
+    border-radius: 5px;
+    min-height: 24px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #7aa2f7;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical { height: 0; }

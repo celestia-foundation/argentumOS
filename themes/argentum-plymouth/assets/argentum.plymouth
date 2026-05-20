@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Argentum
+Description=argentumOS boot splash
+ModuleName=script
+
+[script]
+ImageDir=/etc/plymouth/themes/argentum
+ScriptFile=/etc/plymouth/themes/argentum/argentum.script

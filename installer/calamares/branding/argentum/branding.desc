@@ -1,0 +1,38 @@
+---
+componentName: argentum
+
+# Window chrome — frameless, fullscreen, dark palette.
+welcomeStyleCalamares: true
+welcomeExpandingLogo: false
+windowExpanding: fullscreen
+windowPlacement: center
+windowSize: 1024px,680px
+windowTitlebar: false
+
+strings:
+  productName:         argentumOS
+  shortProductName:    argentumOS
+  version:             "0.1.0"
+  shortVersion:        "0.1"
+  versionedName:       "argentumOS 0.1"
+  shortVersionedName:  "argentumOS 0.1"
+  bootloaderEntryName: argentumOS
+  productUrl:          "https://github.com/"
+  supportUrl:          "https://github.com/"
+  releaseNotesUrl:     "https://github.com/"
+
+# splash.png comes from themes/argentum-plymouth/assets/ — single source of
+# truth in the working tree, materialised here by installer/default.nix.
+images:
+  productLogo:    "splash.png"
+  productIcon:    "splash.png"
+  productWelcome: "splash.png"
+
+slideshow:    "show.qml"
+slideshowAPI: 2
+
+style:
+  sidebarBackground:    "#0f1218"
+  sidebarText:          "#e6e8ee"
+  sidebarTextSelect:    "#0f1218"
+  sidebarTextHighlight: "#7aa2f7"

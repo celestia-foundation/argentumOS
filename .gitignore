@@ -1,0 +1,6 @@
+*.iso
+*iso
+*.qcow2
+*.fd
+result/
+flake.lock
