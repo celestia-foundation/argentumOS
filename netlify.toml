@@ -1,0 +1,7 @@
+[build]
+  base = "argentumOSwebsite"
+  command = "bun run generate"
+  publish = ".output/public"
+
+[build.environment]
+  NODE_VERSION = "22"
