@@ -39,8 +39,13 @@ rustPlatform.buildRustPackage {
   cargoLock = {
     lockFile = ./Cargo.lock;
     outputHashes = {
-      # TODO: replace with real hash after first nix build attempt.
-      # "gpui-0.1.0" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      # One entry per unique git source — the hash is shared across every
+      # crate vendored from this Zed rev (gpui, collections, util, …).
+      "collections-0.1.0" = "sha256-480HTo6kHhJ1bVUzHBxYhWI6gVCpoVyPuNNMPQ6wWbw=";
+      "naga-29.0.3" = "sha256-jwPdrd2XLvK5ddEutR/39OLMh2JU3UXNWIcJKCndh+U=";
+      "xim-ctext-0.3.0" = "sha256-pRT4Sz1JU9ros47/7pmIW9kosWOGMOItcnNd+VrvnpE=";
+      "zed-scap-0.0.8-zed" = "sha256-BihiQHlal/eRsktyf0GI3aSWsUCW7WcICMsC2Xvb7kw=";
+      "zed-font-kit-0.14.1-zed" = "sha256-KXygi0olNQi5yM8eaJVykNDtbPMDjT+cWPBF8UrtXR4=";
     };
   };
 
