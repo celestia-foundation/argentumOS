@@ -98,10 +98,10 @@ If the solution involved the terminal, congratulations, you found a bug.
 
 I use NixOS daily.
 argentumOS exists so nobody else has to.
-xoxo CelestiaG
+xoxo Celestia
 
 ---
 
 *Contributing? There’s a `flake.nix`, some scripts, and documentation scattered around like breadcrumbs. You’ll find it.*
 
-*hosted in Celestia Foundation, made by sinisterMage it's his work*
+> *hosted in Celestia Foundation, made by sinisterMage it's his work*
