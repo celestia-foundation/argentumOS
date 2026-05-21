@@ -48,6 +48,8 @@ rustPlatform.buildRustPackage {
     };
   };
 
+  env = { RUST_MIN_STACK = "16777216"; };
+
   nativeBuildInputs = [ pkg-config makeWrapper ];
 
   buildInputs = [
