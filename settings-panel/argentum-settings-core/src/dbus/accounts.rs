@@ -65,4 +65,36 @@ pub async fn current() -> Result<UserAccount> {
     .await
 }
 
-// TODO: change-password modal (passwd via pty).
+/// Set `username`'s password to `new_password` via `pkexec chpasswd`.
+///
+/// `chpasswd` reads `user:password` lines from stdin — one-shot, no pty
+/// dance. The polkit rule shipped in `modules/settings.nix` covers the
+/// `org.freedesktop.policykit.exec` action for wheel, so a configured admin
+/// gets an admin password prompt (not the user's own password).
+pub async fn set_password(username: &str, new_password: &str) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let line = format!("{username}:{new_password}\n");
+    on_runtime(async move {
+        let mut child = tokio::process::Command::new("pkexec")
+            .arg("chpasswd")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(line.as_bytes()).await?;
+            stdin.shutdown().await?;
+        }
+        let out = child.wait_with_output().await?;
+        if out.status.success() {
+            Ok(())
+        } else {
+            Err(Error::Subprocess {
+                cmd: "pkexec chpasswd".into(),
+                code: out.status.code().unwrap_or(-1),
+                stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+            })
+        }
+    })
+    .await
+}

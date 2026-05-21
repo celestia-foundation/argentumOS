@@ -44,9 +44,11 @@ pub fn render(selected: Page, app: Entity<App>) -> impl IntoElement {
                 .px(px(8.))
                 .child(row(Page::Appearance, selected, app.clone()))
                 .child(row(Page::Display, selected, app.clone()))
+                .child(row(Page::Sound, selected, app.clone()))
                 .child(row(Page::Network, selected, app.clone()))
                 .child(row(Page::Users, selected, app.clone()))
                 .child(row(Page::Software, selected, app.clone()))
+                .child(row(Page::DateTime, selected, app.clone()))
                 .child(row(Page::System, selected, app)),
         )
 }

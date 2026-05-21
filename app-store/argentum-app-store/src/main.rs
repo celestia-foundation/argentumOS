@@ -4,6 +4,7 @@ mod app;
 mod pages;
 mod sidebar;
 mod theme;
+mod widgets;
 
 use clap::Parser;
 use pages::Page;
@@ -19,10 +20,33 @@ struct Args {
     /// (e.g. `--app org.kde.kcalc`).
     #[arg(long)]
     app: Option<String>,
+
+    /// Positional URL handler input. Accepts `appstream:<app-id>` and
+    /// `mintinstall:<app-id>` forms emitted by xdg-open + the .desktop's
+    /// MimeType registration. Falls through to a no-op if it doesn't match.
+    url: Option<String>,
+}
+
+fn parse_url_deeplink(url: &str) -> Option<String> {
+    for scheme in ["appstream:", "mintinstall:"] {
+        if let Some(rest) = url.strip_prefix(scheme) {
+            let id = rest.trim_start_matches("//").trim();
+            if !id.is_empty() {
+                return Some(id.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
+    if let Some(url) = args.url.take() {
+        if let Some(id) = parse_url_deeplink(&url) {
+            args.app = Some(id);
+            args.page = Page::Discover;
+        }
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(

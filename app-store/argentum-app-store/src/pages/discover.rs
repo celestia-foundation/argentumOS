@@ -119,6 +119,19 @@ impl DiscoverPage {
         })
         .detach();
     }
+
+    pub fn launch_installed(&self, app_id: &str) {
+        // Fire-and-forget: spawn `flatpak run` outside our address space so
+        // the app store remains usable. stderr/stdout are detached.
+        if let Err(e) = std::process::Command::new("flatpak")
+            .args(["run", app_id])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            tracing::warn!(?e, app_id, "failed to flatpak run");
+        }
+    }
 }
 
 impl Render for DiscoverPage {
@@ -215,6 +228,7 @@ pub(crate) fn grid(items: &[AppSummary], cx: &mut Context<DiscoverPage>) -> impl
             app_id: item.app_id.clone(),
             name: item.name.clone(),
             summary: item.summary.clone(),
+            icon_url: item.icon.clone(),
         };
         let card = app_card::render::<DiscoverPage>(data, cx, |this, id, cx| this.open_detail(id, cx));
         grid = grid.child(div().w(px(220.)).child(card));
@@ -259,6 +273,11 @@ fn loaded_detail(
         .unwrap_or_default();
     let verified = if d.verified { " · verified publisher" } else { "" };
 
+    // After an install finishes successfully, the last log line is
+    // `Exit(0)`. Use that as the cue to surface the "Open" button so the
+    // user can launch what they just installed without leaving the page.
+    let install_succeeded = matches!(install_log.last(), Some(ProgressLine::Exit(0)));
+
     div()
         .flex()
         .flex_col()
@@ -281,6 +300,11 @@ fn loaded_detail(
                 ),
         )
         .child(install_button(installing, cx))
+        .child(if install_succeeded {
+            open_button(&d.flatpak_app_id, cx).into_any_element()
+        } else {
+            div().into_any_element()
+        })
         .child(
             div()
                 .flex()
@@ -294,6 +318,23 @@ fn loaded_detail(
                 .child(truncate_paragraph(&d.description, 1200)),
         )
         .child(progress_row::render("Install", install_log, installing))
+}
+
+fn open_button(app_id: &str, cx: &mut Context<DiscoverPage>) -> impl IntoElement {
+    let id = app_id.to_string();
+    div()
+        .id("open-installed")
+        .h(px(36.))
+        .px_4()
+        .flex()
+        .items_center()
+        .bg(rgb(theme::SURFACE))
+        .text_color(rgb(theme::ACCENT))
+        .rounded(px(6.))
+        .cursor_pointer()
+        .hover(|s| s.bg(rgb(theme::SIDEBAR)))
+        .on_click(cx.listener(move |this, _e, _w, _cx| this.launch_installed(&id)))
+        .child("Open ↗")
 }
 
 fn install_button(installing: bool, cx: &mut Context<DiscoverPage>) -> impl IntoElement {

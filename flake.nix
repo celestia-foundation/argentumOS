@@ -20,6 +20,7 @@
         ./modules/desktop
         ./modules/apps/flatpak.nix
         ./modules/apps/app-store.nix
+        ./modules/apps/argentum-update-notifier.nix
         ./modules/wine
         ./modules/branding
         ./modules/settings.nix

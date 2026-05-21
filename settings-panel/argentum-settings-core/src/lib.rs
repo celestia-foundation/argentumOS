@@ -8,8 +8,10 @@
 //! caller's responsibility: spawn a task on the framework's executor, await a
 //! function from this crate, then dispatch the result back to the UI.
 
+pub mod datetime;
 pub mod display;
 pub mod os_release;
+pub mod sound;
 pub mod system;
 pub mod theme_scan;
 pub mod wallpaper_scan;

@@ -2,6 +2,7 @@
 
 use crate::pages::{Page, PageState};
 use crate::theme;
+use crate::widgets::prompt;
 use argentum_settings_core::dbus::flatpak as backend;
 use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
@@ -12,6 +13,7 @@ use std::collections::HashSet;
 pub struct SoftwarePage {
     state: PageState<Vec<backend::Remote>>,
     add_pending: bool,
+    add_error: Option<String>,
     in_flight: HashSet<String>,
 }
 
@@ -20,10 +22,65 @@ impl SoftwarePage {
         let s = Self {
             state: PageState::Empty,
             add_pending: false,
+            add_error: None,
             in_flight: Default::default(),
         };
         s.spawn_refresh(cx);
         s
+    }
+
+    fn start_add_remote(&mut self, cx: &mut Context<Self>) {
+        if self.add_pending {
+            return;
+        }
+        self.add_pending = true;
+        self.add_error = None;
+        cx.notify();
+        cx.spawn(async move |weak, async_cx| {
+            let pair = match prompt::name_and_url(
+                "Add Flatpak remote",
+                "Name (e.g. flathub-beta)",
+                "URL (.flatpakrepo or repo root)",
+            )
+            .await
+            {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.add_pending = false;
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+                Err(e) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.add_pending = false;
+                        this.add_error = Some(e.to_string());
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+            };
+            let (name, url) = pair;
+            let result = backend::add_remote(&name, &url).await;
+            weak.update(async_cx, |this, cx| {
+                this.add_pending = false;
+                match result {
+                    Ok(()) => {
+                        this.add_error = None;
+                        this.spawn_refresh(cx);
+                    }
+                    Err(e) => {
+                        this.add_error = Some(e.to_string());
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn spawn_refresh(&self, cx: &mut Context<Self>) {
@@ -87,9 +144,14 @@ impl Render for SoftwarePage {
             self.spawn_refresh(cx);
         }
         let body: AnyElement = match &self.state {
-            PageState::Loaded { data, .. } => {
-                remotes_view(data, &self.in_flight, self.add_pending, cx).into_any_element()
-            }
+            PageState::Loaded { data, .. } => remotes_view(
+                data,
+                &self.in_flight,
+                self.add_pending,
+                self.add_error.as_deref(),
+                cx,
+            )
+            .into_any_element(),
             PageState::Error(e) => error_view(e).into_any_element(),
             _ => skeleton().into_any_element(),
         };
@@ -128,6 +190,7 @@ fn remotes_view(
     remotes: &[backend::Remote],
     in_flight: &HashSet<String>,
     add_pending: bool,
+    add_error: Option<&str>,
     cx: &mut Context<SoftwarePage>,
 ) -> gpui::Div {
     let mut col = div().flex().flex_col().gap_3();
@@ -136,7 +199,16 @@ fn remotes_view(
     for r in remotes {
         col = col.child(remote_row(r, in_flight.contains(&r.name), cx));
     }
-    col = col.child(add_remote_form(add_pending, cx));
+    col = col.child(add_remote_button(add_pending, cx));
+    if let Some(err) = add_error {
+        col = col.child(
+            div()
+                .px_4()
+                .py_2()
+                .text_color(rgb(theme::TEXT_MUTED))
+                .child(format!("Add remote failed: {err}")),
+        );
+    }
     col
 }
 
@@ -211,24 +283,19 @@ fn remote_row(
     row.into_any_element()
 }
 
-fn add_remote_form(pending: bool, cx: &mut Context<SoftwarePage>) -> gpui::Div {
-    // TODO: real text input. For now Add is a no-op (logs intent) so the
-    // button is at least responsive — actual flatpak remote-add happens once
-    // the input widget exists.
-    let add_button = div()
+fn add_remote_button(pending: bool, cx: &mut Context<SoftwarePage>) -> gpui::Div {
+    let button = div()
         .id("add-remote")
-        .h(px(36.))
+        .h(px(40.))
         .px_4()
         .flex()
         .items_center()
         .bg(rgb(if pending { theme::SIDEBAR } else { theme::ACCENT }))
         .text_color(rgb(theme::BG))
-        .rounded(px(6.))
+        .rounded(px(8.))
         .cursor_pointer()
-        .on_click(cx.listener(|_this, _event, _window, _cx| {
-            tracing::info!("add-remote click — text input TODO");
-        }))
-        .child(if pending { "Adding…" } else { "Add" }.to_string());
+        .on_click(cx.listener(|this, _event, _window, cx| this.start_add_remote(cx)))
+        .child(if pending { "Adding…" } else { "+ Add remote…" }.to_string());
 
     div()
         .flex()
@@ -239,27 +306,10 @@ fn add_remote_form(pending: bool, cx: &mut Context<SoftwarePage>) -> gpui::Div {
         .py_3()
         .bg(rgb(theme::SURFACE))
         .rounded(px(10.))
-        .child(div().text_color(rgb(theme::TEXT_MUTED)).child("Add remote"))
         .child(
             div()
-                .flex()
-                .flex_row()
-                .gap_2()
-                .child(input_placeholder("Name (e.g. flathub-beta)"))
-                .child(input_placeholder("URL"))
-                .child(add_button),
+                .text_color(rgb(theme::TEXT_MUTED))
+                .child("Add a Flatpak remote (e.g. flathub-beta) — opens a name + URL prompt."),
         )
-}
-
-fn input_placeholder(label: &str) -> gpui::Div {
-    div()
-        .h(px(36.))
-        .flex_1()
-        .px_3()
-        .flex()
-        .items_center()
-        .bg(rgb(theme::BG))
-        .rounded(px(6.))
-        .text_color(rgb(theme::TEXT_MUTED))
-        .child(label.to_string())
+        .child(button)
 }

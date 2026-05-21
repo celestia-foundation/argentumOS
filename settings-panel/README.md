@@ -141,14 +141,11 @@ The sidebar picks up the new entry automatically from the `Page` enum so no edit
 
 ## Known stubs / TODOs
 
-These are intentional and marked `// TODO:` in the source. Each has a one-line description at the stub site:
-
 - **Wayland display backend** (`argentum-settings-core/src/display.rs`) — currently `wlr-randr` stub. argentumOS ships X11 today; revisit when Wayland lands.
-- **NetworkManager WiFi enumeration** (`argentum-settings-core/src/dbus/network.rs`) — the AP-walk over `Device.Wireless` + `AccessPoint` proxies is not implemented. Page shows an inline empty-state.
-- **WiFi password modal** (`argentum-settings-core/src/dbus/network.rs`) — secured networks show "Password required (coming soon)" inline.
-- **Change-password sheet** (`argentum-settings-core/src/dbus/accounts.rs`) — Users page shows "Change password… (coming soon)" button.
-- **Flatpak app browser** — out of scope for the settings panel; lives in the separate (planned) argentumOS App Store.
-- **Text input widget** (`argentum-settings/src/pages/software.rs`) — the Add-Remote form's name/URL fields are visual placeholders. Real input requires wrapping GPUI's text-input primitive; deferred to a follow-up.
+- **Inline GPUI text input** — text capture is currently routed through `widgets::prompt` (a `zenity` modal subprocess). When GPUI gains a stable inline text-input primitive, `widgets::text_input` becomes the in-pane drop-in replacement and `prompt` collapses to the same surface. `widgets/mod.rs` is the single seam.
+- **Display resolution / scale picker** — display.rs lists monitors and modes but the UI doesn't expose a selector yet. Backend (`argentum-settings-core/src/display.rs`) already supports `apply_mode` for the eventual click handler.
+- **Bluetooth page** — deferred this cycle. Cinnamon's tray applet still handles pair/connect. Reopen if/when self-sufficiency is wanted.
+- **Argentum-ui crate extraction** — `widgets/prompt.rs` is duplicated verbatim in `app-store/argentum-app-store/src/widgets/`; the M5 extraction into a workspace-shared `argentum-ui` crate is deferred (low payoff: ~80 LOC duplication vs. dual Cargo lock + hash churn).
 
 ## Tests
 

@@ -156,6 +156,7 @@ fn grid(items: &[AppSummary], cx: &mut Context<CategoriesPage>) -> impl IntoElem
             app_id: item.app_id.clone(),
             name: item.name.clone(),
             summary: item.summary.clone(),
+            icon_url: item.icon.clone(),
         };
         let card = app_card::render::<CategoriesPage>(data, cx, |_this, _id, _cx| {
             // TODO: route into a detail page once Categories owns its own

@@ -17,3 +17,13 @@ pub const TEXT_MUTED: u32 = 0x8E8E93;
 /// Accent at ~50% alpha — focus rings, in-flight underlines.
 #[allow(dead_code)]
 pub const ACCENT_SOFT_A: f32 = 0.5;
+
+/// Input field background.
+#[allow(dead_code)]
+pub const INPUT_BG: u32 = 0x141416;
+/// Input field 1px border in resting state.
+#[allow(dead_code)]
+pub const INPUT_BORDER: u32 = 0x3A3A3C;
+/// Input field border on focus.
+#[allow(dead_code)]
+pub const INPUT_FOCUS: u32 = ACCENT;

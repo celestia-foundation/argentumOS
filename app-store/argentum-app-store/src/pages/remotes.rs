@@ -8,6 +8,7 @@
 use crate::pages::components::skeleton;
 use crate::pages::{Page, PageState};
 use crate::theme;
+use crate::widgets::prompt;
 use argentum_app_store_core::flatpak::remotes::{self as backend, Remote};
 use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
@@ -19,6 +20,7 @@ pub struct RemotesPage {
     state: PageState<Vec<Remote>>,
     in_flight: HashSet<String>,
     add_pending: bool,
+    add_error: Option<String>,
 }
 
 impl RemotesPage {
@@ -27,9 +29,64 @@ impl RemotesPage {
             state: PageState::Empty,
             in_flight: Default::default(),
             add_pending: false,
+            add_error: None,
         };
         s.spawn_refresh(cx);
         s
+    }
+
+    fn start_add(&mut self, cx: &mut Context<Self>) {
+        if self.add_pending {
+            return;
+        }
+        self.add_pending = true;
+        self.add_error = None;
+        cx.notify();
+        cx.spawn(async move |weak, async_cx| {
+            let pair = match prompt::name_and_url(
+                "Add Flatpak remote",
+                "Name (e.g. flathub-beta)",
+                "URL (.flatpakrepo or repo root)",
+            )
+            .await
+            {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.add_pending = false;
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+                Err(e) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.add_pending = false;
+                        this.add_error = Some(e.to_string());
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+            };
+            let (name, url) = pair;
+            let result = backend::add_remote(&name, &url).await;
+            weak.update(async_cx, |this, cx| {
+                this.add_pending = false;
+                match result {
+                    Ok(()) => {
+                        this.add_error = None;
+                        this.spawn_refresh(cx);
+                    }
+                    Err(e) => {
+                        this.add_error = Some(e.to_string());
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn spawn_refresh(&self, cx: &mut Context<Self>) {
@@ -110,7 +167,7 @@ impl Render for RemotesPage {
             self.spawn_refresh(cx);
         }
         let body: AnyElement = match &self.state {
-            PageState::Loaded { data, .. } => remotes_view(data, &self.in_flight, self.add_pending, cx).into_any_element(),
+            PageState::Loaded { data, .. } => remotes_view(data, &self.in_flight, self.add_pending, self.add_error.as_deref(), cx).into_any_element(),
             PageState::Error(e) => skeleton::error_view(e).into_any_element(),
             _ => skeleton::rows(2, 56.).into_any_element(),
         };
@@ -128,6 +185,7 @@ fn remotes_view(
     remotes: &[Remote],
     in_flight: &HashSet<String>,
     add_pending: bool,
+    add_error: Option<&str>,
     cx: &mut Context<RemotesPage>,
 ) -> impl IntoElement {
     let mut col = div().flex().flex_col().gap_3();
@@ -135,7 +193,7 @@ fn remotes_view(
     for r in remotes {
         col = col.child(remote_row(r, in_flight.contains(&r.name), cx));
     }
-    col = col.child(add_form(add_pending, cx));
+    col = col.child(add_form(add_pending, add_error, cx));
     col
 }
 
@@ -197,25 +255,21 @@ fn remote_row(r: &Remote, in_flight: bool, cx: &mut Context<RemotesPage>) -> Any
     row.into_any_element()
 }
 
-fn add_form(pending: bool, cx: &mut Context<RemotesPage>) -> impl IntoElement {
-    // TODO (shared limitation): real text input. Once GPUI text input lands,
-    // wire two inputs + Add button → `backend::add_remote(name, url)`.
-    let add_button = div()
+fn add_form(pending: bool, error: Option<&str>, cx: &mut Context<RemotesPage>) -> impl IntoElement {
+    let button = div()
         .id("add-remote")
-        .h(px(36.))
+        .h(px(40.))
         .px_4()
         .flex()
         .items_center()
         .bg(rgb(if pending { theme::SIDEBAR } else { theme::ACCENT }))
         .text_color(rgb(theme::BG))
-        .rounded(px(6.))
+        .rounded(px(8.))
         .cursor_pointer()
-        .on_click(cx.listener(|_this, _e, _w, _cx| {
-            tracing::info!("add-remote click — text input TODO");
-        }))
-        .child(if pending { "Adding…" } else { "Add" }.to_string());
+        .on_click(cx.listener(|this, _e, _w, cx| this.start_add(cx)))
+        .child(if pending { "Adding…" } else { "+ Add remote…" }.to_string());
 
-    div()
+    let mut col = div()
         .flex()
         .flex_col()
         .gap_2()
@@ -224,27 +278,18 @@ fn add_form(pending: bool, cx: &mut Context<RemotesPage>) -> impl IntoElement {
         .py_3()
         .bg(rgb(theme::SURFACE))
         .rounded(px(10.))
-        .child(div().text_color(rgb(theme::TEXT_MUTED)).child("Add remote"))
         .child(
             div()
-                .flex()
-                .flex_row()
-                .gap_2()
-                .child(input_placeholder("Name (e.g. flathub-beta)"))
-                .child(input_placeholder("URL"))
-                .child(add_button),
+                .text_color(rgb(theme::TEXT_MUTED))
+                .child("Add a Flatpak remote — opens a name + URL prompt."),
         )
-}
-
-fn input_placeholder(label: &str) -> impl IntoElement {
-    div()
-        .h(px(36.))
-        .flex_1()
-        .px_3()
-        .flex()
-        .items_center()
-        .bg(rgb(theme::BG))
-        .rounded(px(6.))
-        .text_color(rgb(theme::TEXT_MUTED))
-        .child(label.to_string())
+        .child(button);
+    if let Some(err) = error {
+        col = col.child(
+            div()
+                .text_color(rgb(theme::TEXT_MUTED))
+                .child(format!("Add remote failed: {err}")),
+        );
+    }
+    col
 }

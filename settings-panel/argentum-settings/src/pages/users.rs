@@ -2,6 +2,7 @@
 
 use crate::pages::{Page, PageState};
 use crate::theme;
+use crate::widgets::prompt;
 use argentum_settings_core::dbus::accounts::{self as backend, AccountType, UserAccount};
 use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Render,
@@ -10,11 +11,22 @@ use gpui::{
 
 pub struct UsersPage {
     state: PageState<UserAccount>,
+    password_pending: bool,
+    password_status: Option<PasswordStatus>,
+}
+
+enum PasswordStatus {
+    Ok,
+    Err(String),
 }
 
 impl UsersPage {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let s = Self { state: PageState::Empty };
+        let s = Self {
+            state: PageState::Empty,
+            password_pending: false,
+            password_status: None,
+        };
         s.spawn_refresh(cx);
         s
     }
@@ -32,6 +44,72 @@ impl UsersPage {
         })
         .detach();
     }
+
+    fn start_change_password(&mut self, cx: &mut Context<Self>) {
+        if self.password_pending {
+            return;
+        }
+        let username = match &self.state {
+            PageState::Loaded { data, .. } => data.username.clone(),
+            _ => return,
+        };
+        self.password_pending = true;
+        self.password_status = None;
+        cx.notify();
+        cx.spawn(async move |weak, async_cx| {
+            let new = match prompt::password("Change password", "New password").await {
+                Ok(Some(s)) if !s.is_empty() => s,
+                Ok(_) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.password_pending = false;
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+                Err(e) => {
+                    weak.update(async_cx, |this, cx| {
+                        this.password_pending = false;
+                        this.password_status = Some(PasswordStatus::Err(e.to_string()));
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+            };
+            let confirm = match prompt::password("Confirm password", "Re-enter to confirm").await {
+                Ok(Some(s)) => s,
+                _ => {
+                    weak.update(async_cx, |this, cx| {
+                        this.password_pending = false;
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+            };
+            if new != confirm {
+                weak.update(async_cx, |this, cx| {
+                    this.password_pending = false;
+                    this.password_status = Some(PasswordStatus::Err("Passwords didn't match.".into()));
+                    cx.notify();
+                })
+                .ok();
+                return;
+            }
+            let result = backend::set_password(&username, &new).await;
+            weak.update(async_cx, |this, cx| {
+                this.password_pending = false;
+                this.password_status = Some(match result {
+                    Ok(()) => PasswordStatus::Ok,
+                    Err(e) => PasswordStatus::Err(e.to_string()),
+                });
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
 }
 
 impl Render for UsersPage {
@@ -39,26 +117,26 @@ impl Render for UsersPage {
         if self.state.should_refresh(Page::Users.ttl()) {
             self.spawn_refresh(cx);
         }
-        // TODO: open a right-side sheet that prompts current + new + confirm
-        // passwords and shells `passwd` via pkexec through a pty. For now, the
-        // click is a no-op that records intent in the log so it's at least
-        // visibly responsive (rather than a dead button).
+        let pending = self.password_pending;
         let change_password_button = div()
             .id("change-password")
             .px_4()
             .py_2()
-            .bg(rgb(theme::BG))
+            .bg(rgb(if pending { theme::SIDEBAR } else { theme::ACCENT }))
             .rounded(px(8.))
-            .text_color(rgb(theme::TEXT))
+            .text_color(rgb(theme::BG))
             .cursor_pointer()
-            .hover(|s| s.bg(rgb(theme::SIDEBAR)))
-            .on_click(cx.listener(|_this, _event, _window, _cx| {
-                tracing::info!("change-password click — modal TODO");
-            }))
-            .child("Change password…  (coming soon)");
+            .on_click(cx.listener(|this, _event, _window, cx| this.start_change_password(cx)))
+            .child(if pending { "Changing…" } else { "Change password…" }.to_string());
+
+        let status_line = match &self.password_status {
+            Some(PasswordStatus::Ok) => Some((theme::ACCENT, "Password updated.".to_string())),
+            Some(PasswordStatus::Err(e)) => Some((theme::TEXT_MUTED, format!("Couldn't update: {e}"))),
+            None => None,
+        };
 
         let body = match &self.state {
-            PageState::Loaded { data, .. } => account_view(data, change_password_button),
+            PageState::Loaded { data, .. } => account_view(data, change_password_button, status_line),
             PageState::Error(e) => error_view(e),
             _ => skeleton(),
         };
@@ -88,7 +166,11 @@ fn error_view(msg: &str) -> gpui::Div {
         .child(format!("Couldn't read accounts: {msg}"))
 }
 
-fn account_view(user: &UserAccount, change_password_button: impl IntoElement) -> gpui::Div {
+fn account_view(
+    user: &UserAccount,
+    change_password_button: impl IntoElement,
+    status_line: Option<(u32, String)>,
+) -> gpui::Div {
     let initials: String = user
         .real_name
         .split_whitespace()
@@ -136,4 +218,8 @@ fn account_view(user: &UserAccount, change_password_button: impl IntoElement) ->
                 ),
         )
         .child(change_password_button)
+        .child(match status_line {
+            Some((color, text)) => div().text_color(rgb(color)).child(text),
+            None => div(),
+        })
 }

@@ -1,20 +1,20 @@
 //! Search page — local AppStream catalog, fuzzy match on name + summary.
 //!
-//! Real text input is a known GPUI gap at the pinned commit (the settings
-//! panel's `software.rs::add_remote_form` lives with the same limitation).
-//! Until that's solved we render a "type to search" stub plus a static set of
-//! quick links (popular categories + the full popular grid) so the page is
-//! still useful. The infrastructure for real search — local AppStream load,
-//! ranking, grid render — is in place; wiring a `TextInput` element is the
-//! single missing piece.
+//! Without a working inline GPUI text-input primitive at the pinned commit,
+//! we collect the query through a `zenity --entry` modal. The "Search…"
+//! button opens the modal; the page renders the ranked results below. The
+//! infrastructure for inline-input search remains intact (`rank()` is
+//! unchanged) — only the input collection mechanism is modal for now.
 
 use crate::pages::components::{app_card, skeleton};
 use crate::pages::{Page, PageState};
 use crate::theme;
+use crate::widgets::prompt;
 use argentum_app_store_core::appstream::{self, AppMeta};
 use argentum_app_store_core::flathub_api::{self as api, AppSummary};
 use gpui::{
-    AnyElement, Context, IntoElement, ParentElement, Render, Styled, Window, div, px, rgb,
+    AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render,
+    StatefulInteractiveElement, Styled, Window, div, px, rgb,
 };
 
 pub struct SearchData {
@@ -25,11 +25,12 @@ pub struct SearchData {
 pub struct SearchPage {
     state: PageState<SearchData>,
     query: String,
+    pending: bool,
 }
 
 impl SearchPage {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let s = Self { state: PageState::Empty, query: String::new() };
+        let s = Self { state: PageState::Empty, query: String::new(), pending: false };
         s.spawn_refresh(cx);
         s
     }
@@ -47,6 +48,34 @@ impl SearchPage {
             }).ok();
         })
         .detach();
+    }
+
+    fn open_search_prompt(&mut self, cx: &mut Context<Self>) {
+        if self.pending {
+            return;
+        }
+        self.pending = true;
+        let initial = self.query.clone();
+        cx.notify();
+        cx.spawn(async move |weak, async_cx| {
+            let q = prompt::text("Search apps", "What are you looking for?", &initial)
+                .await
+                .unwrap_or(None);
+            weak.update(async_cx, |this, cx| {
+                this.pending = false;
+                if let Some(q) = q {
+                    this.query = q;
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn clear_query(&mut self, cx: &mut Context<Self>) {
+        self.query.clear();
+        cx.notify();
     }
 }
 
@@ -68,29 +97,48 @@ impl Render for SearchPage {
             .size_full()
             .p_6()
             .child(div().text_xl().pb_4().child("Search"))
-            .child(input_stub(&self.query))
+            .child(search_bar(&self.query, self.pending, cx))
             .child(div().h(px(12.)))
             .child(body)
     }
 }
 
-fn input_stub(query: &str) -> impl IntoElement {
-    // TODO: real text input. Until then this is a static affordance hinting
-    // at what's coming. Search still happens — populated `query` is exercised
-    // in tests — it just can't currently take keystrokes from the UI.
-    div()
+fn search_bar(query: &str, pending: bool, cx: &mut Context<SearchPage>) -> impl IntoElement {
+    let label = if pending {
+        "Waiting for input…".to_string()
+    } else if query.is_empty() {
+        "Click to search…".to_string()
+    } else {
+        format!("Searching: {query}")
+    };
+    let mut row = div()
+        .id("search-bar")
         .h(px(40.))
         .px_3()
         .flex()
+        .flex_row()
         .items_center()
+        .justify_between()
         .bg(rgb(theme::SURFACE))
         .rounded(px(8.))
-        .text_color(rgb(theme::TEXT_MUTED))
-        .child(if query.is_empty() {
-            "Type to search apps (text input TODO — meanwhile, use Discover/Categories)".to_string()
-        } else {
-            format!("Searching: {query}")
-        })
+        .cursor_pointer()
+        .hover(|s| s.bg(rgb(theme::SIDEBAR)))
+        .on_click(cx.listener(|this, _e, _w, cx| this.open_search_prompt(cx)))
+        .child(div().text_color(rgb(theme::TEXT_MUTED)).child(label))
+        .child(div().text_color(rgb(theme::ACCENT)).child("⌕"));
+    if !query.is_empty() {
+        let clear = div()
+            .id("clear-query")
+            .px_3()
+            .py_1()
+            .ml_2()
+            .text_color(rgb(theme::TEXT_MUTED))
+            .cursor_pointer()
+            .on_click(cx.listener(|this, _e, _w, cx| this.clear_query(cx)))
+            .child("Clear");
+        row = row.child(clear);
+    }
+    row
 }
 
 fn loaded_view(data: &SearchData, query: &str, cx: &mut Context<SearchPage>) -> impl IntoElement {
@@ -113,9 +161,10 @@ fn loaded_view(data: &SearchData, query: &str, cx: &mut Context<SearchPage>) -> 
             app_id: app.app_id.clone(),
             name: app.name.clone(),
             summary: app.summary.clone(),
+            icon_url: None,
         };
         let card = app_card::render::<SearchPage>(data, cx, |_this, _id, _cx| {
-            tracing::info!("search result clicked — detail view TODO");
+            tracing::info!("search result clicked — detail view follow-up");
         });
         grid = grid.child(div().w(px(220.)).child(card));
     }
@@ -133,9 +182,10 @@ fn popular_grid(items: &[AppSummary], cx: &mut Context<SearchPage>) -> impl Into
             app_id: item.app_id.clone(),
             name: item.name.clone(),
             summary: item.summary.clone(),
+            icon_url: item.icon.clone(),
         };
         let card = app_card::render::<SearchPage>(data, cx, |_this, _id, _cx| {
-            tracing::info!("popular card clicked — detail view TODO");
+            tracing::info!("popular card clicked — detail view follow-up");
         });
         grid = grid.child(div().w(px(220.)).child(card));
     }

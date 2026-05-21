@@ -4,6 +4,7 @@ mod app;
 mod pages;
 mod sidebar;
 mod theme;
+mod widgets;
 
 use clap::Parser;
 use pages::Page;

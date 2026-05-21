@@ -13,6 +13,7 @@
 , openssl
 , alsa-lib
 , flatpak
+, zenity
 , makeWrapper
 }:
 
@@ -88,7 +89,7 @@ rustPlatform.buildRustPackage {
     ]} $out/bin/argentum-app-store
 
     wrapProgram $out/bin/argentum-app-store \
-      --prefix PATH : ${lib.makeBinPath [ flatpak ]}
+      --prefix PATH : ${lib.makeBinPath [ flatpak zenity ]}
   '';
 
   meta = {

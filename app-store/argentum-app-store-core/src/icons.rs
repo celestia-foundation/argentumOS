@@ -23,6 +23,28 @@ pub enum IconSource {
     Url(String),
 }
 
+/// Synchronous cache lookup. Returns `Some(path)` if the file is already on
+/// disk (no I/O beyond a `metadata()` syscall). UI render paths call this on
+/// every frame: cheap, branchless, never blocks.
+pub fn cached_path(url: &str) -> Option<PathBuf> {
+    let p = cache_path_for(url);
+    if p.exists() { Some(p) } else { None }
+}
+
+/// Fetch into the disk cache if not already there. Returns the cache path on
+/// success. Idempotent — calling repeatedly is safe and cheap once cached.
+pub async fn ensure_cached(url: String) -> Result<PathBuf> {
+    on_runtime(async move {
+        let path = cache_path_for(&url);
+        if path.exists() {
+            return Ok(path);
+        }
+        let _ = fetch_url(url.clone()).await?;
+        Ok(path)
+    })
+    .await
+}
+
 async fn fetch_url(url: String) -> Result<Vec<u8>> {
     let cached_path = cache_path_for(&url);
     if let Ok(bytes) = tokio::fs::read(&cached_path).await {

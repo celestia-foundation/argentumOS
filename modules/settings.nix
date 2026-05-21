@@ -13,12 +13,13 @@ let
   cinnamon-settings-shim = pkgs.writeShellScriptBin "cinnamon-settings" ''
     page="''${1:-appearance}"
     case "$page" in
-      sound|sound-input|sound-output) page=appearance ;;
+      sound|sound-input|sound-output) page=sound ;;
       backgrounds|themes|fonts)        page=appearance ;;
       display|monitor)                 page=display ;;
       network|wifi|vpn)                page=network ;;
       user|users|accounts)             page=users ;;
       flatpak|applications|software)   page=software ;;
+      datetime|time|calendar)          page=date-time ;;
       hostname|info|details|system)    page=system ;;
     esac
     exec ${argentum-settings}/bin/argentum-settings --page "$page"
@@ -36,9 +37,17 @@ in {
     # Order matters: cinnamon-settings-shim must come before the cinnamon
     # package on PATH so its `cinnamon-settings` wins. `environment.systemPackages`
     # resolves earlier list entries first when building the system profile.
+    #
+    # `zenity` backs `widgets::prompt` (hostname, password, add-remote prompts)
+    # — must be present on PATH at runtime. `pulseaudio` provides `pactl` for
+    # the Sound page (PipeWire's pulse compat layer accepts pactl commands).
+    # `networkmanager` provides `nmcli` for the WiFi connect flow.
     environment.systemPackages = [
       cinnamon-settings-shim
       argentum-settings
+      pkgs.zenity
+      pkgs.pulseaudio   # ships pactl
+      pkgs.networkmanager  # ships nmcli
     ];
 
     # Replace the .desktop entry so menu launchers / xdg-open also route to
