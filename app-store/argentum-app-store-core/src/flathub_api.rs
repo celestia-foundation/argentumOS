@@ -2,9 +2,14 @@
 //!
 //! Endpoints we use (v2):
 //!   - `GET /api/v2/appstream/{app_id}`           rich detail
-//!   - `GET /api/v2/collection/popular/30`        featured grid (popular)
-//!   - `GET /api/v2/collection/recently-added/30`
+//!   - `GET /api/v2/collection/popular`           featured grid (popular)
+//!   - `GET /api/v2/collection/recently-added`
 //!   - `GET /api/v2/collection/category/{name}`   category browse
+//!
+//! Note: a previous shape took a `/{limit}` path suffix (e.g.
+//! `.../popular/30`); the current API rejects that with 404. Pagination is
+//! query-param based now (`?page=…&per_page=…`) but the default first page
+//! returns several hundred hits, so we just slice client-side.
 //!
 //! All responses are cached to `~/.cache/argentum-app-store/api/<key>.json`.
 //! On any network failure we fall back to the cached copy if one exists.
@@ -14,7 +19,11 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const BASE: &str = "https://flathub.org/api/v2";
-const TIMEOUT: Duration = Duration::from_secs(5);
+// 5s was too aggressive in a fresh QEMU image — DNS warm-up + first TLS
+// handshake to the Flathub CDN routinely runs 3-7s. Anything past 15s is a
+// real failure, not a slow link.
+const TIMEOUT: Duration = Duration::from_secs(15);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppDetail {
@@ -44,7 +53,7 @@ pub struct Screenshot {
 struct RawAppDetail {
     #[serde(default)]
     flatpak_app_id: Option<String>,
-    #[serde(default, alias = "id")]
+    #[serde(default)]
     id: Option<String>,
     #[serde(default)]
     name: Option<String>,
@@ -54,7 +63,7 @@ struct RawAppDetail {
     description: Option<String>,
     #[serde(default)]
     project_license: Option<String>,
-    #[serde(default, alias = "developer_name")]
+    #[serde(default)]
     developer_name: Option<String>,
     #[serde(default)]
     icon: Option<String>,
@@ -94,9 +103,19 @@ struct CollectionResponse {
     hits: Vec<RawSummary>,
 }
 
+// The collection endpoints return both `id` (underscored form, e.g.
+// `com_discordapp_Discord`) and `app_id` (dotted, the canonical flatpak ref
+// `com.discordapp.Discord`). Serde aliases can't share a field when both
+// keys are present in the same object — that produces the "duplicate field"
+// parse error — so we deserialize each separately and prefer `app_id`,
+// falling back to `flatpak_app_id` then `id` (dot-restored).
 #[derive(Debug, Deserialize)]
 struct RawSummary {
-    #[serde(default, alias = "app_id", alias = "flatpak_app_id", alias = "id")]
+    #[serde(default)]
+    app_id: Option<String>,
+    #[serde(default)]
+    flatpak_app_id: Option<String>,
+    #[serde(default)]
     id: Option<String>,
     #[serde(default)]
     name: Option<String>,
@@ -127,28 +146,29 @@ pub async fn app_detail(app_id: &str) -> Result<AppDetail> {
 }
 
 pub async fn popular(limit: u32) -> Result<Vec<AppSummary>> {
-    fetch_collection(format!("collection/popular/{limit}")).await
+    fetch_collection("collection/popular".into(), limit).await
 }
 
 pub async fn recently_added(limit: u32) -> Result<Vec<AppSummary>> {
-    fetch_collection(format!("collection/recently-added/{limit}")).await
+    fetch_collection("collection/recently-added".into(), limit).await
 }
 
 pub async fn category(name: &str, limit: u32) -> Result<Vec<AppSummary>> {
-    let name = name.to_string();
-    fetch_collection(format!("collection/category/{name}/{limit}")).await
+    let path = format!("collection/category/{name}");
+    fetch_collection(path, limit).await
 }
 
-async fn fetch_collection(path: String) -> Result<Vec<AppSummary>> {
+async fn fetch_collection(path: String, limit: u32) -> Result<Vec<AppSummary>> {
     on_runtime(async move {
         let key = format!("collection-{}", path.replace('/', "_"));
         let url = format!("{BASE}/{path}");
+        let take_n = limit as usize;
         match fetch_json::<CollectionResponse>(&url, &key).await {
-            Ok(resp) => Ok(into_summaries(resp.hits)),
+            Ok(resp) => Ok(into_summaries(resp.hits).into_iter().take(take_n).collect()),
             Err(e) => {
                 if let Some(cached) = read_cache::<CollectionResponse>(&key).await {
                     tracing::warn!(?e, "flathub api failed, using cache");
-                    Ok(into_summaries(cached.hits))
+                    Ok(into_summaries(cached.hits).into_iter().take(take_n).collect())
                 } else {
                     Err(e)
                 }
@@ -161,9 +181,13 @@ async fn fetch_collection(path: String) -> Result<Vec<AppSummary>> {
 async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str, cache_key: &str) -> Result<T> {
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
+        .connect_timeout(CONNECT_TIMEOUT)
         .user_agent(concat!("argentum-app-store/", env!("CARGO_PKG_VERSION")))
         .build()?;
-    let resp = client.get(url).send().await?;
+    let resp = client.get(url).send().await.map_err(|e| {
+        tracing::warn!(?e, url, "flathub fetch failed");
+        e
+    })?;
     if !resp.status().is_success() {
         return Err(Error::Http(format!("{} -> {}", url, resp.status())));
     }
@@ -231,7 +255,10 @@ fn pick_full(s: RawScreenshot) -> Option<String> {
 fn into_summaries(raw: Vec<RawSummary>) -> Vec<AppSummary> {
     raw.into_iter()
         .filter_map(|r| {
-            let id = r.id?;
+            let id = r
+                .app_id
+                .or(r.flatpak_app_id)
+                .or_else(|| r.id.map(|s| s.replace('_', ".")))?;
             if id.is_empty() {
                 return None;
             }

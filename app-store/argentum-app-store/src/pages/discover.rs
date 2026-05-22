@@ -14,6 +14,11 @@ use gpui::{
 pub struct DiscoverData {
     pub popular: Vec<AppSummary>,
     pub recent: Vec<AppSummary>,
+    /// First error encountered while fetching either collection. We don't fail
+    /// the whole page on one collection error — empty grids render the
+    /// existing empty-state — but we surface the reason as a small banner so
+    /// the user knows whether to wait, retry, or check connectivity.
+    pub fetch_error: Option<String>,
 }
 
 pub enum View {
@@ -40,11 +45,17 @@ impl DiscoverPage {
 
     fn spawn_refresh(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |weak, async_cx| {
-            let popular = api::popular(30).await.unwrap_or_default();
-            let recent = api::recently_added(30).await.unwrap_or_default();
+            let pop_res = api::popular(30).await;
+            let rec_res = api::recently_added(30).await;
+            let fetch_error = match (&pop_res, &rec_res) {
+                (Err(e), _) | (_, Err(e)) => Some(e.to_string()),
+                _ => None,
+            };
+            let popular = pop_res.unwrap_or_default();
+            let recent = rec_res.unwrap_or_default();
             weak.update(async_cx, |this, cx| {
                 this.state = PageState::Loaded {
-                    data: DiscoverData { popular, recent },
+                    data: DiscoverData { popular, recent, fetch_error },
                     fetched_at: std::time::Instant::now(),
                 };
                 cx.notify();
@@ -199,11 +210,39 @@ fn list_skeleton() -> impl IntoElement {
 }
 
 fn list_view(data: &DiscoverData, cx: &mut Context<DiscoverPage>) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
-        .child(div().text_color(rgb(theme::TEXT_MUTED)).child("Popular"))
+    let mut col = div().flex().flex_col().gap_4();
+    if let Some(err) = data.fetch_error.as_deref() {
+        // Distinguish "network down" from "Flathub returned 500" from
+        // "DNS resolution failed" — the message comes straight from reqwest
+        // and is the most actionable thing we can show the user.
+        col = col.child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .gap_3()
+                .px_4()
+                .py_3()
+                .bg(rgb(theme::SURFACE))
+                .rounded(px(10.))
+                .text_color(rgb(theme::TEXT_MUTED))
+                .child(div().child(format!("Flathub fetch error: {err}")))
+                .child(
+                    div()
+                        .id("retry-fetch")
+                        .px_3()
+                        .py_1()
+                        .bg(rgb(theme::ACCENT))
+                        .text_color(rgb(theme::BG))
+                        .rounded(px(6.))
+                        .cursor_pointer()
+                        .on_click(cx.listener(|this, _e, _w, cx| this.spawn_refresh(cx)))
+                        .child("Retry"),
+                ),
+        );
+    }
+    col.child(div().text_color(rgb(theme::TEXT_MUTED)).child("Popular"))
         .child(grid(&data.popular, cx))
         .child(div().text_color(rgb(theme::TEXT_MUTED)).child("Recently added"))
         .child(grid(&data.recent, cx))
